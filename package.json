@@ -3,13 +3,12 @@
   "version": "1.1.0",
   "description": "Digital Twins in AEC Industry",
   "engines": {
-    "node": "14.15.4"
+    "node": "14.15.0"
   },
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "postinstall": "npm rebuild node-sass --force",
     "postinstall": "npm rebuild node-sass-middleware --force"
   },
   "repository": "https://github.com/ccps-lab/cogbim-forge",
@@ -31,7 +30,6 @@
     "mongodb": "^3.6.2",
     "mongoose": "^5.10.10",
     "multer": "^1.4.2",
-    "node-sass": "^5.0.0",
     "node-sass-middleware": "^0.11.0",
     "passport": "^0.4.1",
     "passport-jwt": "^4.0.0",
