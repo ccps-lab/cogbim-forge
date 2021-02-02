@@ -3,7 +3,7 @@
   "version": "1.1.0",
   "description": "Digital Twins in AEC Industry",
   "engines": {
-    "node": "14.15.0"
+    "node": "12.13.0"
   },
   "main": "app.js",
   "scripts": {
