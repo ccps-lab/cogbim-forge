@@ -1,10 +1,22 @@
 const path = require("path");
 const express = require("express");
-const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
+const passport = require("passport");
+const bodyParser = require("body-parser");
+const session = require("express-session");
+// const flash = require("express-flash");
+// const methodOverride = require('method-override')
+
+const sassMiddleware = require("node-sass-middleware");
+
 const Temperature = require("./models/temperatures");
+const User = require("./models/user");
 
 require("dotenv").config();
+require("./auth/auth");
+
+// Router
+const indexRouter = require("./routes/router");
 
 const PORT = process.env.PORT || 3000;
 const config = require("./config/config");
@@ -25,14 +37,75 @@ let app = express();
 const http = require("http").createServer(app);
 const io = require("socket.io")(http);
 
-app.use(express.static(path.join(__dirname, "public")));
+// Sass middleware
+app.use(
+  sassMiddleware({
+    /* Options */
+    src: path.join(__dirname, "scss"),
+    dest: path.join(__dirname, "public/assets/css"),
+    debug: true,
+    watchFiles: true,
+    outputStyle: "compressed",
+    prefix: "/assets/css", // Where prefix is at <link rel="stylesheets" href="prefix/style.css"/>
+  })
+);
+
+app.use("/assets", express.static(path.join(__dirname, "/public/assets")));
 // app.use(express.json({ limit: "50mb" }));
 app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use("/api/forge/oauth", require("./routes/oauth"));
-app.use("/api/forge/oss", require("./routes/oss"));
-app.use("/api/forge/modelderivative", require("./routes/modelderivative"));
-app.use("/api/v1/db", require("./routes/db"));
+app.use(bodyParser.urlencoded({ extended: false }));
+// app.use(flash());
+
+const sessionExpiresIn = 1800000;
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      maxAge: sessionExpiresIn,
+    },
+  })
+);
+app.use(passport.initialize());
+app.use(passport.session());
+// app.use(methodOverride('_method'))
+
+app.use("/", indexRouter);
+
+// Route to Homepage
+app.get("/", checkAuthenticated, (req, res) => {
+  res.sendFile(__dirname + "/public/index.html");
+});
+
+// Route to Login Page
+app.get("/login", checkNotAuthenticated, (req, res) => {
+  res.sendFile(__dirname + "/public/login.html");
+});
+
+app.delete("/logout", (req, res) => {
+  req.logOut();
+  res.redirect("/login");
+});
+
+// Check Authentication
+function checkAuthenticated(req, res, next) {
+  if (req.isAuthenticated()) {
+    return next();
+  }
+
+  res.redirect("/login");
+}
+
+function checkNotAuthenticated(req, res, next) {
+  if (req.isAuthenticated()) {
+    return res.redirect("/");
+  }
+  next();
+}
+
+// Plug in the JWT strategy as a middleware so only verified users can access this route.
+// app.use("/user", passport.authenticate("jwt", { session: false }), secureRoute);
 
 // Express Error Handlers
 app.use((err, req, res, next) => {
@@ -41,18 +114,20 @@ app.use((err, req, res, next) => {
   res.status(err.statusCode).json(err);
 });
 
-/*
-Socket.io Setting
-*/
-
+// Socket.io Setting
 io.on("connection", function () {
-  io.set('transports', ['websocket','xhr-polling']);
+  io.set("transports", ["websocket", "xhr-polling"]);
   console.log("A connection to Socket has been established.");
 });
 
-
-mongoose.connect(config.db.uri, { useNewUrlParser: true });
+// mongoose.connect(config.db.uri, { useNewUrlParser: true });
+mongoose.connect(config.db.uri, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+});
+mongoose.set("useCreateIndex", true);
 const db = mongoose.connection;
+mongoose.Promise = global.Promise;
 
 db.on("error", console.error.bind(console, "Connection Error:"));
 
@@ -75,7 +150,6 @@ db.once("open", () => {
         sensor_room: temperature.sensor_room,
         temperature: temperature.temperature,
       });
-
     } else if (change.operationType === "delete") {
       io.emit("sensorDataDeleted", change.documentKey._id);
     }
